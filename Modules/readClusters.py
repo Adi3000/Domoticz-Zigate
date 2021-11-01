@@ -33,6 +33,7 @@ from Modules.tools import (
     is_hex,
     voltage2batteryP,
     checkAttribute,
+    checkValidValue,
     checkAndStoreAttributeValue,
     set_status_datastruct,
     set_timestamp_datastruct,
@@ -3955,6 +3956,15 @@ def Cluster0702(self, Devices, MsgSQN, MsgSrcAddr, MsgSrcEp, MsgClusterId, MsgAt
         return
 
     checkAttribute(self, MsgSrcAddr, MsgSrcEp, MsgClusterId, MsgAttrID)
+    if not checkValidValue(self, MsgAttType, MsgClusterData):
+        self.log.logging(
+            "Cluster",
+            "Info",
+            "Cluster0702 - MsgAttrID: %s MsgAttType: %s DataLen: %s : invalid Data Value found : %s"
+            % (MsgAttrID, MsgAttType, MsgAttSize, MsgClusterData),
+            MsgSrcAddr,
+        )
+        return
 
     value = decodeAttribute(self, MsgAttType, MsgClusterData)
     if MsgAttType not in ("41", "42"):
