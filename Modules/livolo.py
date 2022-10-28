@@ -12,10 +12,10 @@
 
 import Domoticz
 from Classes.LoggingManagement import LoggingManagement
+from Zigbee.zclCommands import zcl_level_move_to_level, zcl_toggle
 
 from Modules.domoMaj import MajDomoDevice
 from Modules.tools import retreive_cmd_payload_from_8002
-from Modules.zclCommands import zcl_level_move_to_level, zcl_toggle
 from Modules.zigateConsts import ZIGATE_EP
 
 # Livolo commands.
@@ -90,7 +90,7 @@ def livoloReadRawAPS(self, Devices, srcNWKID, srcEp, ClusterID, dstNWKID, dstEP,
 
     # At Device Annoucement 0x00 and 0x05 are sent by device
 
-    GlobalCmd, SQN, ManufacturerCode, Command, Data = retreive_cmd_payload_from_8002(MsgPayload)
+    default_response, GlobalCmd, SQN, ManufacturerCode, Command, Data = retreive_cmd_payload_from_8002(MsgPayload)
 
     if Command == "00":  # Read Attribute request with On/Off status
         OnOff = Data[-2:]

@@ -49,5 +49,11 @@
 		"0402": [
 			"0000"
 		]
+	},
+	"VoltageConverter": 10,
+	"BatteryDevice": 1,
+	"BatteryPercentageConverter": 2,
+	"Param": {
+		"disableTrackingEraticValue": 0
 	}
 }

@@ -8,6 +8,7 @@
 			"0006": "",
 			"000a": "",
 			"0019": "",
+			"e001": "",
 			"Type": "Button_3"
 		},
 		"02": {
@@ -55,5 +56,7 @@
 	},
 	"Param": {
 		"TS004FMode": "Scene"
-	}
+	},
+	        "BatteryDevice": 1,
+	 "BatteryPercentageConverter": 2
 }

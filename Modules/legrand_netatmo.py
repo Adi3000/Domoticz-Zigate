@@ -25,7 +25,7 @@ from Modules.readAttributes import (ReadAttributeRequest_0b04_050b,
                                     ReadAttributeRequest_fc01,
                                     ReadAttributeRequest_fc40)
 from Modules.sendZigateCommand import raw_APS_request
-from Modules.tools import (extract_info_from_8085, get_and_inc_SQN,
+from Modules.tools import (extract_info_from_8085, get_and_inc_ZCL_SQN,
                            is_ack_tobe_disabled,
                            retreive_cmd_payload_from_8002)
 from Modules.zigateConsts import (HEARTBEAT, LEGRAND_REMOTES, MAX_LOAD_ZIGATE,
@@ -38,8 +38,7 @@ LEGRAND_CLUSTER_FC01 = {
     "Shutter switch with neutral": {"EnableLedShutter": "0001"},
     "Micromodule switch": {"None": "None"},
 }
-
-
+ 
 def pollingLegrand(self, key):
 
     """
@@ -70,7 +69,7 @@ def legrandReadRawAPS(self, Devices, srcNWKID, srcEp, ClusterID, dstNWKID, dstEP
         % (srcNWKID, srcEp, ClusterID, dstNWKID, dstEP, MsgPayload),
     )
     # At Device Annoucement 0x00 and 0x05 are sent by device
-    GlobalCommand, Sqn, ManufacturerCode, Command, Data = retreive_cmd_payload_from_8002(MsgPayload)
+    default_response, GlobalCommand, Sqn, ManufacturerCode, Command, Data = retreive_cmd_payload_from_8002(MsgPayload)
     self.log.logging(
         "Legrand",
         "Debug",
@@ -115,7 +114,7 @@ def legrandReadRawAPS(self, Devices, srcNWKID, srcEp, ClusterID, dstNWKID, dstEP
 
 
 def assign_group_membership_to_legrand_remote(self, NwkId, Ep, leftright=None):
-    sqn = get_and_inc_SQN(self, NwkId)
+    sqn = get_and_inc_ZCL_SQN(self, NwkId)
     cmd = "08"
     if leftright:
         cmd = "0c"
@@ -496,7 +495,7 @@ def legrand_fc40(self, nwkid, Mode):
         nwkid=nwkid,
     )
 
-    sqn = get_and_inc_SQN(self, nwkid)
+    sqn = get_and_inc_ZCL_SQN(self, nwkid)
 
     fcf = "15"
     # manufspec = "01"
@@ -697,7 +696,7 @@ def legrandReenforcement(self, NWKID):
         if cmd == "None":
             continue
 
-        if self.busy or self.ZigateComm.loadTransmit() > MAX_LOAD_ZIGATE:
+        if self.busy or self.ControllerLink.loadTransmit() > MAX_LOAD_ZIGATE:
             return True
 
         if cmd not in self.ListOfDevices[NWKID]["Legrand"]:
@@ -744,19 +743,35 @@ def legrand_dimmer_enable(self, NwkId):
         return
     bindDevice(self, ieee, "01", "0008", destaddr=None, destep="01")
 
-    # Configure Reporting
-    # 0x0008 / 0x0000  Change 0x01, Min: 0x01, Max: 600
+    attribute_reporting_record = {
+        "Attribute": "0000",
+        "DataType": "20",
+        "minInter": "0001",
+        "maxInter": "0258",
+        "timeOut": "0000",
+    }
+
     self.configureReporting.send_configure_reporting_attributes_set(
-        NwkId, "01", "0008", "00", "00", "0000", 1, "0020000000010258000001", [0x0000]
-    )
+        NwkId, ZIGATE_EP, "01", "0008", "00", "00", "0000", [ attribute_reporting_record,] )
+    
     # 0x0008 / 0x00011 Change 0x01 Min: 0x00, Max 600
+    attribute_reporting_record = {
+        "Attribute": "0000",
+        "DataType": "20",
+        "minInter": "0000",
+        "maxInter": "0258",
+        "timeOut": "0000",
+    }
+
+    #self.configureReporting.send_configure_reporting_attributes_set(
+    #    NwkId, ZIGATE_EP, "01", "0008", "00", "00", "0000", 1, "0020/0011/0000/0258/0000/01", [0x0011])
     self.configureReporting.send_configure_reporting_attributes_set(
-        NwkId, "01", "0008", "00", "00", "0000", 1, "0020001100000258000001", [0x0011]
-    )
+        NwkId, ZIGATE_EP, "01", "0008", "00", "00", "0000", [attribute_reporting_record,])
 
     # Read Attribute 0x0008 / 0x0000 , 0x0011
     read_attribute(self, NwkId, ZIGATE_EP, "01", "0008", "00", "00", "0000", 1, "0000", ackIsDisabled=True)
-    read_attribute(self, NwkId, ZIGATE_EP, "01", "0008", "00", "00", "0011", 1, "0000", ackIsDisabled=True)
+    read_attribute(self, NwkId, ZIGATE_EP, "01", "0008", "00", "00", "0000", 1, "0011", ackIsDisabled=True)
+    
     # Read Attribute 0x0006 / 0x0000
     read_attribute(self, NwkId, ZIGATE_EP, "01", "0006", "00", "00", "0000", 1, "0000", ackIsDisabled=True)
 

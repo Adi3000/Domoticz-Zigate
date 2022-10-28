@@ -12,6 +12,18 @@ from time import time
 import Domoticz
 from Classes.WebServer.headerResponse import prepResponseMessage, setupHeadersResponse
 
+LIST_CLUSTERTYPE_FOR_GROUPS = ( 
+    "LvlControl", "Switch", "Plug",
+    "SwitchAQ2", "DSwitch", "Button", "DButton",
+    "LivoloSWL", "LivoloSWR",
+    "ColorControlRGB", "ColorControlWW", "ColorControlRGBWW", "ColorControlFull", "ColorControl",
+    "VenetianInverted", "Venetian",
+    "WindowCovering",
+    "Curtain", "CurtainInverted",
+    "VanneInverted", "Vanne",
+    "BlindInverted", "Blind",
+    "BSO-Volet", "BSO-Orientation",
+)
 
 def rest_zGroup_lst_avlble_dev(self, verb, data, parameters):
 
@@ -32,9 +44,9 @@ def rest_zGroup_lst_avlble_dev(self, verb, data, parameters):
     _widget["Ep"] = "01"
     _widget["ZDeviceName"] = "Zigate (Coordinator)"
 
-    if self.zigatedata and "IEEE" in self.zigatedata:
-        _widget["IEEE"] = self.zigatedata["IEEE"]
-        _device["_NwkId"] = self.zigatedata["Short Address"]
+    if self.ControllerData and "IEEE" in self.ControllerData:
+        _widget["IEEE"] = self.ControllerData["IEEE"]
+        _device["_NwkId"] = self.ControllerData["Short Address"]
 
     _device["WidgetList"].append(_widget)
     device_lst.append(_device)
@@ -93,25 +105,7 @@ def rest_zGroup_lst_avlble_dev(self, verb, data, parameters):
                 if "ClusterType" in self.ListOfDevices[x]["Ep"][ep]:
                     clusterType = self.ListOfDevices[x]["Ep"][ep]["ClusterType"]
                     for widgetID in clusterType:
-                        if clusterType[widgetID] not in (
-                            "LvlControl",
-                            "Switch",
-                            "Plug",
-                            "SwitchAQ2",
-                            "DSwitch",
-                            "Button",
-                            "DButton",
-                            "LivoloSWL",
-                            "LivoloSWR",
-                            "ColorControlRGB",
-                            "ColorControlWW",
-                            "ColorControlRGBWW",
-                            "ColorControlFull",
-                            "ColorControl",
-                            "VenetianInverted",
-                            "Venetian",
-                            "WindowCovering",
-                        ):
+                        if clusterType[widgetID] not in LIST_CLUSTERTYPE_FOR_GROUPS:
                             continue
 
                         for widget in self.Devices:
@@ -129,25 +123,7 @@ def rest_zGroup_lst_avlble_dev(self, verb, data, parameters):
                     clusterType = self.ListOfDevices[x]["ClusterType"]
 
                     for widgetID in clusterType:
-                        if clusterType[widgetID] not in (
-                            "LvlControl",
-                            "Switch",
-                            "Plug",
-                            "SwitchAQ2",
-                            "DSwitch",
-                            "Button",
-                            "DButton",
-                            "LivoloSWL",
-                            "LivoloSWR",
-                            "ColorControlRGB",
-                            "ColorControlWW",
-                            "ColorControlRGBWW",
-                            "ColorControlFull",
-                            "ColorControl",
-                            "VenetianInverted",
-                            "Venetian",
-                            "WindowCovering",
-                        ):
+                        if clusterType[widgetID] not in LIST_CLUSTERTYPE_FOR_GROUPS:
                             continue
 
                         for widget in self.Devices:

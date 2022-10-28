@@ -25,9 +25,6 @@ ZIGATE_MAX_BUFFER_SIZE = 255
 # Threshold before switching to Busy state. If we have or more than MAX_FOR_ZIGATE_BUZY in the FIFO queue
 MAX_FOR_ZIGATE_BUZY = 10
 
-# If there is a need to read more than 4 Attributes at a time, then breakdown the request into several.
-MAX_READATTRIBUTES_REQ = 3  # Number of Attributes to be requested via 0x0100
-
 # Number of silmutaneous command sent to ZiGate. It must be 1 in case of firmware below 31c
 MAX_SIMULTANEOUS_ZIGATE_COMMANDS = 1
 
@@ -138,26 +135,131 @@ ZHA_DATA_TYPE = {
 SIZE_DATA_TYPE = {
     #    For each Data Type, provide the length in number of bytes
     "09": 2,  # 16bit data
-    "10": 1,  # Bool
-    "18": 1,  # 8bitmap
+    # data / discrete
+    "08": 1,
+    "0a": 3,
+    "0b": 4,
+    "0c": 5,
+    "0d": 6,
+    "0e": 7,
+    "0f": 8,
+    # Boolean
+    "10": 1,
+    # Bitmap / discrete
     "16": 2,  # 16bitmap
+    "18": 1,  # 8bitmap
     "19": 2,  # 16BitBitMap = 0x19
+    "1a": 3,
+    "1b": 4,
+    "1c": 5,
+    "1d": 6,
+    "1e": 7,
+    "1f": 8,
+    # Unsigned / Analog
     "20": 1,  # uint8
     "21": 2,  # uint16
     "22": 3,  # Uint24
     "23": 4,  # Uint32
     "24": 5,  # Uint40
     "25": 6,  # Uint48
+    "26": 7,
+    "27": 8,
+    # Signed / Analog
     "28": 1,  # int8
     "29": 2,  # int16
     "2a": 3,  # int24
     "2b": 4,  # int32
+    "2c": 5,
     "2d": 6,  # int48
+    "2e": 7,
+    "2f": 8,
+    # Enum / Discret
     "30": 1,  # enum8
     "31": 2,  # enum16
+    # precision / Analog
+    "38": 2,
     "39": 4,  # Single Float
+    "3a": 8,
+    # Analog
+    "e0": 4,
+    "e1": 4,
     "e2": 4,  # UTCtime
+    "e8": 2,
+    "e9": 2,
+    "f0": 8, # IEEE
+    "f1": 16
 }
+
+
+def discrete_value(data_type):
+    return data_type in (
+        0x08,
+        0x09,
+        0x0A,
+        0x0B,
+        0x0C,
+        0x0D,
+        0x0E,
+        0x0F,
+        0x10,
+        0x18,
+        0x19,
+        0x1A,
+        0x1B,
+        0x1C,
+        0x1D,
+        0x1E,
+        0x1F,
+        0x30,
+        0x31,
+        0xE8,
+        0xE9,
+        0xEA,
+        0xF0,
+        0xF1,
+    )
+
+
+def analog_value(data_type):
+    return data_type in (
+        0x20,
+        0x21,
+        0x22,
+        0x23,
+        0x24,
+        0x25,
+        0x26,
+        0x27,
+        0x28,
+        0x29,
+        0x2A,
+        0x2B,
+        0x2C,
+        0x2D,
+        0x2E,
+        0x2F,
+        0x38,
+        0x39,
+        0x3A,
+        0xE0,
+        0xE1,
+        0xE2,
+    )
+
+
+def composite_value(data_type):
+    return data_type in (
+        0x41,
+        0x42,
+        0x43,
+        0x44,
+        0x48,
+        0x4C,
+        0x50,
+        0x51,
+    )
+
+
 
 ZLL_DEVICES = {
     # https://www.nxp.com/docs/en/user-guide/JN-UG-3091.pdf
@@ -1695,12 +1797,12 @@ CLUSTERS_LIST = [
     "ff66",  # Private Cluster for ZLinky_TIC
 ]
 
-LEGRAND_REMOTES = ("Remote switch", "Double gangs remote switch", "Shutters central remote switch", "Remote motion sensor", "Remote toggle switch")
+LEGRAND_REMOTES = ("Remote switch", "Double gangs remote switch", "Shutters central remote switch", 
+                    "Remote motion sensor", "Remote toggle switch", "Remote switch Wake up Sleep")
 LEGRAND_REMOTE_SWITCHS = ("Remote switch", "Double gangs remote switch", "Remote toggle switch")
 LEGRAND_REMOTE_SHUTTER = ("Shutters central remote switch",)
 LEGRAND_REMOTE_MOTION = ("Remote motion sensor",)
-
-
+ 
 CFG_RPT_ATTRIBUTESbyCLUSTERS = {
     # 0xFFFF sable reporting- # 6460   - 6 hours # 0x0E10 - 3600s A hour # 0x0708 - 30' # 0x0384 - 15' # 0x012C - 5' # 0x003C - 1'
     # Datatype

@@ -12,7 +12,7 @@
 
 from Modules.domoMaj import MajDomoDevice
 from Modules.domoTools import lastSeenUpdate
-from Modules.tools import  updSQN, extract_info_from_8085
+from Modules.tools import updSQN, extract_info_from_8085
 
 
 def ikea_openclose_remote(self, Devices, NwkId, Ep, command, Data, Sqn):
@@ -57,6 +57,8 @@ def ikea_remote_control_8085( self, Devices, MsgSrcAddr,MsgEP, MsgClusterId, Msg
         self.ListOfDevices[MsgSrcAddr]["Ep"][MsgEP][MsgClusterId]["0000"] = "Cmd: %s, %s" % (MsgCmd, unknown_)
 
 def ikea_remote_control_8095( self, Devices, MsgSrcAddr,MsgEP, MsgClusterId, MsgCmd, unknown_ ):
+    self.log.logging("Input", "Debug", "ikea_remote_control_8095 - Command: %s" % MsgCmd, MsgSrcAddr)
+    
 
     if MsgClusterId == "0006" and MsgCmd == "02":
         MajDomoDevice(self, Devices, MsgSrcAddr, MsgEP, "rmt1", "toggle")

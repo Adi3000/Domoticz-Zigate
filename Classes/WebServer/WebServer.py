@@ -8,7 +8,7 @@ import json
 import mimetypes
 import os
 import os.path
-from time import time
+import time
 
 import Domoticz
 from Classes.DomoticzDB import DomoticzDB_Preferences
@@ -16,16 +16,16 @@ from Classes.LoggingManagement import LoggingManagement
 from Classes.PluginConf import SETTINGS
 from Classes.WebServer.headerResponse import prepResponseMessage, setupHeadersResponse
 from Modules.actuators import actuators
-from Modules.basicOutputs import ZigatePermitToJoin, initiate_change_channel, setExtendedPANID, start_Zigate, zigateBlueLed 
+from Modules.basicOutputs import ZigatePermitToJoin, initiate_change_channel, setExtendedPANID, start_Zigate, zigateBlueLed , PermitToJoin
 from Modules.enki import enki_set_poweron_after_offon
 from Modules.philips import philips_set_poweron_after_offon
 from Modules.tools import is_hex
+from Modules.txPower import set_TxPower
 from Modules.zigateConsts import CERTIFICATION_CODE, ZCL_CLUSTERS_LIST, ZIGATE_COMMANDS
 from Modules.sendZigateCommand import (raw_APS_request, send_zigatecmd_raw,
                                        send_zigatecmd_zcl_ack,sendZigateCmd,
                                        send_zigatecmd_zcl_noack)
 from Modules.zigateCommands import zigate_set_mode
-
 
 MIMETYPES = {
     "gif": "image/gif",
@@ -69,11 +69,15 @@ class WebServer(object):
     from Classes.WebServer.rest_Topology import rest_netTopologie, rest_req_topologie
     from Classes.WebServer.sendresponse import sendResponse
     from Classes.WebServer.tools import DumpHTTPResponseToLog, keepConnectionAlive
+    from Classes.WebServer.rest_PluginUpgrade import rest_plugin_upgrade
+    from Classes.WebServer.rest_CfgReporting import rest_cfgrpt_ondemand, rest_cfgrpt_ondemand_with_config
+    from Classes.WebServer.rest_ZLinky import rest_zlinky
 
     hearbeats = 0
 
     def __init__(
         self,
+        zigbee_communitation,
         ZigateData,
         PluginParameters,
         PluginConf,
@@ -93,7 +97,7 @@ class WebServer(object):
         httpPort,
         log,
     ):
-
+        self.zigbee_communication = zigbee_communitation
         self.httpServerConn = None
         self.httpClientConn = None
         self.httpServerConns = {}
@@ -109,13 +113,14 @@ class WebServer(object):
         self.WebUsername = WebUserName
         self.WebPassword = WebPassword
         self.pluginconf = PluginConf
-        self.zigatedata = ZigateData
+        self.ControllerData = ZigateData
         self.adminWidget = adminWidgets
-        self.ZigateComm = ZigateComm
+        self.ControllerLink = ZigateComm
         self.statistics = Statistics
         self.pluginParameters = PluginParameters
         self.networkmap = None
         self.networkenergy = None
+        self.configureReporting = None
 
         self.permitTojoin = permitTojoin
 
@@ -128,7 +133,7 @@ class WebServer(object):
         self.DeviceConf = DeviceConf
         self.Devices = Devices
 
-        self.ZigateIEEE = None
+        self.ControllerIEEE = None
 
         self.restart_needed = {"RestartNeeded": 0}
         self.homedirectory = HomeDirectory
@@ -148,6 +153,9 @@ class WebServer(object):
     def update_networkmap(self, networkmap):
         self.networkmap = networkmap
 
+    def update_configureReporting(self,configureReporting ):
+        self.configureReporting = configureReporting
+        
     def add_element_to_devices_in_pairing_mode( self, nwkid):
         if nwkid not in self.DevicesInPairingMode:
             self.DevicesInPairingMode.append( nwkid )
@@ -160,7 +168,7 @@ class WebServer(object):
 
     def setZigateIEEE(self, ZigateIEEE):
 
-        self.ZigateIEEE = ZigateIEEE
+        self.ControllerIEEE = ZigateIEEE
 
     def rest_plugin_health(self, verb, data, parameters):
 
@@ -191,7 +199,7 @@ class WebServer(object):
             self.logging("Status", "Erase ZiGate PDM")
             Domoticz.Error("Erase ZiGate PDM non implémenté pour l'instant")
             if self.pluginconf.pluginConf["eraseZigatePDM"]:
-                if self.pluginParameters["Mode2"] != "None":
+                if self.pluginParameters["Mode2"] != "None" and self.zigbee_communication == "native":
                     sendZigateCmd(self, "0012", "")
                 self.pluginconf.pluginConf["eraseZigatePDM"] = 0
 
@@ -209,12 +217,12 @@ class WebServer(object):
         _response = prepResponseMessage(self, setupHeadersResponse())
         _response["Headers"]["Content-Type"] = "application/json; charset=utf-8"
         if verb == "GET":
-            if self.pluginParameters["Mode2"] != "None":
-                self.zigatedata["startZigateNeeded"] = True
+            if self.pluginParameters["Mode2"] != "None" and self.zigbee_communication == "native":
+                self.ControllerData["startZigateNeeded"] = True
                 # start_Zigate( self )
                 sendZigateCmd(self, "0002", "00")  # Force Zigate to Normal mode
                 sendZigateCmd(self, "0011", "")  # Software Reset
-            action = {"Name": "Software reboot of ZiGate", "TimeStamp": int(time())}
+            action = {"Name": "Software reboot of ZiGate", "TimeStamp": int(time.time())}
         _response["Data"] = json.dumps(action, sort_keys=True)
         return _response
 
@@ -223,8 +231,34 @@ class WebServer(object):
         _response = prepResponseMessage(self, setupHeadersResponse())
         _response["Headers"]["Content-Type"] = "application/json; charset=utf-8"
         if verb == "GET":
-            if self.zigatedata:
-                _response["Data"] = json.dumps(self.zigatedata, sort_keys=True)
+            
+            if self.ControllerData:
+                coordinator_infos = {}
+                coordinator_infos["Firmware Version"] = self.ControllerData["Firmware Version"]
+                coordinator_infos["IEEE"] = self.ControllerData["IEEE"]
+                coordinator_infos["Short Address"] = self.ControllerData["Short Address"]
+                coordinator_infos["Channel"] = self.ControllerData["Channel"]
+                coordinator_infos["PANID"] = self.ControllerData["PANID"]
+                coordinator_infos["Extended PANID"] = self.ControllerData["Extended PANID"]
+                coordinator_infos["Branch Version"] = self.ControllerData["Branch Version"]
+                coordinator_infos["Major Version"] = self.ControllerData["Major Version"] 
+                coordinator_infos["Minor Version"] = self.ControllerData["Minor Version"] 
+                if "Network key" in self.ControllerData:
+                    coordinator_infos[ "Network Key"] = self.ControllerData["Network key"] 
+                                      
+                if 0 <= int(self.ControllerData["Branch Version"]) < 20:   
+                    coordinator_infos["Display Firmware Version"] = "Zig - %s" % self.ControllerData["Minor Version"] 
+                elif 20 <= int(self.ControllerData["Branch Version"]) < 30:
+                    # ZNP
+                    coordinator_infos["Display Firmware Version"] = "Znp - %s" % self.ControllerData["Minor Version"] 
+
+                elif 30 <= int(self.ControllerData["Branch Version"]) < 40:   
+                    # Silicon Labs
+                    coordinator_infos["Display Firmware Version"] = "Ezsp - %s.%s" %(
+                        self.ControllerData["Major Version"] , self.ControllerData["Minor Version"] )
+                else:
+                    coordinator_infos["Display Firmware Version"] = "UNK - %s" % self.ControllerData["Minor Version"] 
+                _response["Data"] = json.dumps(coordinator_infos, sort_keys=True)
             else:
                 fake_zigate = {
                     "Firmware Version": "fake - 0310",
@@ -260,7 +294,8 @@ class WebServer(object):
         _response = prepResponseMessage(self, setupHeadersResponse())
         _response["Headers"]["Content-Type"] = "application/json; charset=utf-8"
         if verb == "GET":
-            _response["Data"] = json.dumps(self.pluginParameters, sort_keys=True)
+            #Domoticz.Log("pluginParameters: %s" %self.pluginParameters)
+            _response["Data"] = json.dumps(self.pluginParameters)
         return _response
 
     def rest_nwk_stat(self, verb, data, parameters):
@@ -342,9 +377,9 @@ class WebServer(object):
         if verb == "GET":
             from Modules.restartPlugin import restartPluginViaDomoticzJsonApi
 
-            restartPluginViaDomoticzJsonApi(self)
+            restartPluginViaDomoticzJsonApi(self, stop=False, url_base_api=self.pluginParameters["Mode5"])
 
-            info = {"Text": "Plugin restarted", "TimeStamp": int(time())}
+            info = {"Text": "Plugin restarted", "TimeStamp": int(time.time())}
             _response["Data"] = json.dumps(info, sort_keys=True)
         return _response
 
@@ -374,7 +409,7 @@ class WebServer(object):
             Statistics["MaxLoad"] = 7
             Statistics["APSAck"] = 100
             Statistics["APSNck"] = 0
-            Statistics["StartTime"] = int(time()) - 120
+            Statistics["StartTime"] = int(time.time()) - 120
         else:
             Statistics["PDMLoads"] = self.statistics._pdmLoads
             Statistics["MaxZiGateRoundTime8000 "] = self.statistics._maxTiming8000
@@ -385,6 +420,8 @@ class WebServer(object):
             Statistics["AvgZiGateRoundTime8012 "] = self.statistics._averageTiming8012
             Statistics["MaxTimeSpentInProcFrame"] = self.statistics._max_reading_thread_timing
             Statistics["AvgTimeSpentInProcFrame"] = self.statistics._average_reading_thread_timing
+            Statistics["MaxTimeSendingZigpy"] = self.statistics._max_reading_zigpy_timing
+            Statistics["AvgTimeSendingZigpy"] = self.statistics._average_reading_zigpy_timing
 
             Statistics["MaxTimeSpentInForwarder"] = self.statistics._maxRxProcesses
             Statistics["AvgTimeSpentInForwarder"] = self.statistics._averageRxProcess
@@ -398,15 +435,15 @@ class WebServer(object):
             Statistics["APSFailure"] = self.statistics._APSFailure
             Statistics["APSAck"] = self.statistics._APSAck
             Statistics["APSNck"] = self.statistics._APSNck
-            Statistics["CurrentLoad"] = self.ZigateComm.loadTransmit()
+            Statistics["CurrentLoad"] = self.ControllerLink.loadTransmit()
             Statistics["MaxLoad"] = self.statistics._MaxLoad
             Statistics["StartTime"] = self.statistics._start
 
             Statistics["MaxApdu"] = self.statistics._MaxaPdu
             Statistics["MaxNpdu"] = self.statistics._MaxnPdu
 
-            Statistics["ForwardedQueueCurrentSize"] = self.ZigateComm.get_forwarder_queue()
-            Statistics["WriterQueueCurrentSize"] = self.ZigateComm.get_writer_queue()
+            Statistics["ForwardedQueueCurrentSize"] = self.ControllerLink.get_forwarder_queue()
+            Statistics["WriterQueueCurrentSize"] = self.ControllerLink.get_writer_queue()
             
             _nbitems = len(self.statistics.TrendStats)
             minTS = 0
@@ -427,7 +464,7 @@ class WebServer(object):
 
                 Statistics["Trend"].append({"_TS": _TS, "Rxps": item["Rxps"], "Txps": item["Txps"], "Load": item["Load"]})
 
-        Statistics["Uptime"] = int(time() - Statistics["StartTime"])
+        Statistics["Uptime"] = int(time.time() - Statistics["StartTime"])
         if Statistics["Uptime"] > 0:
 
             Statistics["Txps"] = round(Statistics["Sent"] / Statistics["Uptime"], 2)
@@ -477,6 +514,12 @@ class WebServer(object):
                     if param not in SETTINGS[_theme]["param"]:
                         continue
                     if SETTINGS[_theme]["param"][param]["hidden"]:
+                        continue
+                    if  (
+                        "ZigpyRadio" in SETTINGS[_theme]["param"][param]
+                        and self.zigbee_communication == 'zigpy'
+                        and self.ControllerLink._radiomodule != SETTINGS[_theme]["param"][param]["ZigpyRadio"]
+                    ):
                         continue
 
                     setting = {
@@ -575,6 +618,12 @@ class WebServer(object):
 
                                         self.pluginconf.pluginConf["debugMatchId"] += self.IEEE2NWK[key] + ","
                                 self.pluginconf.pluginConf["debugMatchId"] = self.pluginconf.pluginConf["debugMatchId"][:-1]  # Remove the last ,
+                                
+                        elif param == "TXpower_set" and self.zigbee_communication == "zigpy":
+                            if self.pluginconf.pluginConf[param] != setting_lst[setting]["current"]:
+                                self.pluginconf.pluginConf[param] = setting_lst[setting]["current"]
+                                set_TxPower(self, self.pluginconf.pluginConf[param])
+                            
                         else:
                             if SETTINGS[_theme]["param"][param]["type"] == "hex":
                                 # Domoticz.Log("--> %s: %s - %s" %(param, self.pluginconf.pluginConf[param], type(self.pluginconf.pluginConf[param])))
@@ -604,10 +653,10 @@ class WebServer(object):
                 info["PermitToJoin"] = 255
             elif duration == 0:
                 info["PermitToJoin"] = 0
-            elif int(time()) >= timestamp + duration:
+            elif int(time.time()) >= timestamp + duration:
                 info["PermitToJoin"] = 0
             else:
-                rest = self.permitTojoin["Starttime"] + self.permitTojoin["Duration"] - int(time())
+                rest = self.permitTojoin["Starttime"] + self.permitTojoin["Duration"] - int(time.time())
 
                 self.logging("Debug", "remain %s s" % rest)
                 info["PermitToJoin"] = rest
@@ -628,16 +677,13 @@ class WebServer(object):
                             self.logging("Log", "Requesting router: %s to disable Permit to join" % router)
                         else:
                             self.logging("Log", "Requesting router: %s to enable Permit to join" % router)
-                        if router == "0000":
-                            TcSignificance = "01"
-                        else:
-                            TcSignificance = "00"
+                        TcSignificance = "01" if router == "0000" else "00"
                         # TcSignificance determines whether the remote device is a ‘Trust Centre’: TRUE: A Trust Centre FALSE: Not a Trust Centre
-                        sendZigateCmd(self, "0049", router + "%02x" % duration + TcSignificance)
+                        #sendZigateCmd(self, "0049", router + "%02x" % duration + TcSignificance)
+                        PermitToJoin(self, "%02x" % duration, TargetAddress=router)
 
-                else:
-                    if self.pluginParameters["Mode2"] != "None":
-                        ZigatePermitToJoin(self, int(data["PermitToJoin"]))
+                elif self.pluginParameters["Mode2"] != "None":
+                    ZigatePermitToJoin(self, int(data["PermitToJoin"]))
         return _response
 
     def rest_Device(self, verb, data, parameters):
@@ -729,93 +775,102 @@ class WebServer(object):
                     del self.IEEE2NWK[ieee]
 
                 # for a remove in case device didn't send the leave
-                if "IEEE" in self.zigatedata and ieee:
+                if "IEEE" in self.ControllerData and ieee:
                     # uParrentAddress + uChildAddress (uint64)
-                    sendZigateCmd(self, "0026", self.zigatedata["IEEE"] + ieee)
+                    if self.zigbee_communication == "native":
+                        sendZigateCmd(self, "0026", self.ControllerData["IEEE"] + ieee)
 
                 action = {"Name": "Device %s/%s removed" % (nwkid, ieee)}
                 _response["Data"] = json.dumps(action, sort_keys=True)
 
         elif verb == "GET":
             _response["Headers"]["Content-Type"] = "application/json; charset=utf-8"
-            device_lst = []
-            for x in self.ListOfDevices:
-                if x == "0000":
-                    continue
+            
+            
+            if len(self.ControllerData) == 0:
+                _response["Data"] = json.dumps(dummy_zdevice_name(), sort_keys=True)
+            else:
+                device_lst = []
+                for x in self.ListOfDevices:
+                    if x == "0000":
+                        continue
 
-                device = {"_NwkId": x}
-                for item in (
-                    "Param",
-                    "ZDeviceName",
-                    "IEEE",
-                    "Model",
-                    "MacCapa",
-                    "Status",
-                    "ConsistencyCheck",
-                    "Health",
-                    "LQI",
-                    "Battery",
-                ):
-                    if item in self.ListOfDevices[x]:
-                        if item == "MacCapa":
-                            device["MacCapa"] = []
-                            mac_capability = int(self.ListOfDevices[x][item], 16)
-                            AltPAN = mac_capability & 0x00000001
-                            DeviceType = (mac_capability >> 1) & 1
-                            PowerSource = (mac_capability >> 2) & 1
-                            ReceiveonIdle = (mac_capability >> 3) & 1
-                            if DeviceType == 1:
-                                device["MacCapa"].append("FFD")
+                    device = {"_NwkId": x}
+                    for item in (
+                        "Param",
+                        "ZDeviceName",
+                        "IEEE",
+                        "Model",
+                        "MacCapa",
+                        "Status",
+                        "ConsistencyCheck",
+                        "Health",
+                        "LQI",
+                        "Battery",
+                    ):
+                        if item in self.ListOfDevices[x]:
+                            if item == "Battery" and self.ListOfDevices[x]["Battery"] in ( {}, ):
+                                if "IASBattery" in self.ListOfDevices[x]:
+                                    device[item] = str(self.ListOfDevices[x][ "IASBattery" ])
+                            elif item == "MacCapa":
+                                device["MacCapa"] = []
+                                mac_capability = int(self.ListOfDevices[x][item], 16)
+                                AltPAN = mac_capability & 0x00000001
+                                DeviceType = (mac_capability >> 1) & 1
+                                PowerSource = (mac_capability >> 2) & 1
+                                ReceiveonIdle = (mac_capability >> 3) & 1
+                                if DeviceType == 1:
+                                    device["MacCapa"].append("FFD")
+                                else:
+                                    device["MacCapa"].append("RFD")
+                                if ReceiveonIdle == 1:
+                                    device["MacCapa"].append("RxonIdle")
+                                if PowerSource == 1:
+                                    device["MacCapa"].append("MainPower")
+                                else:
+                                    device["MacCapa"].append("Battery")
+                                self.logging(
+                                    "Debug",
+                                    "decoded MacCapa from: %s to %s" % (self.ListOfDevices[x][item], str(device["MacCapa"])),
+                                )
+                            elif item == "Param":
+                                device[item] = str(self.ListOfDevices[x][item])
                             else:
-                                device["MacCapa"].append("RFD")
-                            if ReceiveonIdle == 1:
-                                device["MacCapa"].append("RxonIdle")
-                            if PowerSource == 1:
-                                device["MacCapa"].append("MainPower")
-                            else:
-                                device["MacCapa"].append("Battery")
-                            self.logging(
-                                "Debug",
-                                "decoded MacCapa from: %s to %s" % (self.ListOfDevices[x][item], str(device["MacCapa"])),
-                            )
+                                if self.ListOfDevices[x][item] == {}:
+                                    device[item] = ""
+                                else:
+                                    device[item] = self.ListOfDevices[x][item]
                         elif item == "Param":
-                            device[item] = str(self.ListOfDevices[x][item])
+                            # Seems unknown, so let's create it
+                            device[item] = str({})
                         else:
-                            if self.ListOfDevices[x][item] == {}:
-                                device[item] = ""
-                            else:
-                                device[item] = self.ListOfDevices[x][item]
-                    elif item == "Param":
-                        # Seems unknown, so let's create it
-                        device[item] = str({})
-                    else:
-                        device[item] = ""
+                            device[item] = ""
 
-                device["WidgetList"] = []
-                for ep in self.ListOfDevices[x]["Ep"]:
-                    if "ClusterType" in self.ListOfDevices[x]["Ep"][ep]:
-                        clusterType = self.ListOfDevices[x]["Ep"][ep]["ClusterType"]
-                        for widgetID in clusterType:
-                            for widget in self.Devices:
-                                if self.Devices[widget].ID == int(widgetID):
-                                    self.logging("Debug", "Widget Name: %s %s" % (widgetID, self.Devices[widget].Name))
-                                    if self.Devices[widget].Name not in device["WidgetList"]:
-                                        device["WidgetList"].append(self.Devices[widget].Name)
+                    device["WidgetList"] = []
+                    for ep in self.ListOfDevices[x]["Ep"]:
+                        if "ClusterType" in self.ListOfDevices[x]["Ep"][ep]:
+                            clusterType = self.ListOfDevices[x]["Ep"][ep]["ClusterType"]
+                            for widgetID in clusterType:
+                                for widget in self.Devices:
+                                    if self.Devices[widget].ID == int(widgetID):
+                                        self.logging("Debug", "Widget Name: %s %s" % (widgetID, self.Devices[widget].Name))
+                                        if self.Devices[widget].Name not in device["WidgetList"]:
+                                            device["WidgetList"].append(self.Devices[widget].Name)
 
-                    elif "ClusterType" in self.ListOfDevices[x]:
-                        clusterType = self.ListOfDevices[x]["ClusterType"]
-                        for widgetID in clusterType:
-                            for widget in self.Devices:
-                                if self.Devices[widget].ID == int(widgetID):
-                                    self.logging("Debug", "Widget Name: %s %s" % (widgetID, self.Devices[widget].Name))
-                                    if self.Devices[widget].Name not in device["WidgetList"]:
-                                        device["WidgetList"].append(self.Devices[widget].Name)
+                        elif "ClusterType" in self.ListOfDevices[x]:
+                            clusterType = self.ListOfDevices[x]["ClusterType"]
+                            for widgetID in clusterType:
+                                for widget in self.Devices:
+                                    if self.Devices[widget].ID == int(widgetID):
+                                        self.logging("Debug", "Widget Name: %s %s" % (widgetID, self.Devices[widget].Name))
+                                        if self.Devices[widget].Name not in device["WidgetList"]:
+                                            device["WidgetList"].append(self.Devices[widget].Name)
 
-                if device not in device_lst:
-                    device_lst.append(device)
-            # _response["Data"] = json.dumps( device_lst, sort_keys=True )
-            self.logging("Debug", "zDevice_name - sending %s" % device_lst)
-            _response["Data"] = json.dumps(device_lst, sort_keys=True)
+                    if device not in device_lst:
+                        device_lst.append(device)
+                    # _response["Data"] = json.dumps( device_lst, sort_keys=True )
+                    self.logging("Debug", "zDevice_name - sending %s" % device_lst)
+                    _response["Data"] = json.dumps(device_lst, sort_keys=True)
 
         elif verb == "PUT":
             _response["Data"] = None
@@ -883,8 +938,8 @@ class WebServer(object):
             if len(parameters) == 0:
                 zdev_lst = []
                 for item in self.ListOfDevices:
-                    if item == "0000":
-                        continue
+                    #if item == "0000":
+                    #    continue
                     device = {"_NwkId": item}
                     # Main Attributes
                     for attribut in (
@@ -908,15 +963,18 @@ class WebServer(object):
                         "Stack Version",
                         "HW Version",
                     ):
+                        if attribut == "Battery" and attribut in self.ListOfDevices[item] and self.ListOfDevices[item]["Battery"] in ( {}, ):
+                            if "IASBattery" in self.ListOfDevices[item]:
+                                device[attribut] = str(self.ListOfDevices[item][ "IASBattery" ])
 
-                        if attribut in self.ListOfDevices[item]:
+                        elif attribut in self.ListOfDevices[item]:
                             if self.ListOfDevices[item][attribut] == {}:
                                 device[attribut] = ""
 
-                            elif attribut == "ConsistencyCheck" and self.ListOfDevices[item]["Status"] == "notDB":
+                            elif attribut == "ConsistencyCheck" and "Status" in self.ListOfDevices[item] and self.ListOfDevices[item]["Status"] == "notDB":
                                 self.ListOfDevices[item][attribut] = "not in DZ"
 
-                            elif self.ListOfDevices[item][attribut] == "" and self.ListOfDevices[item]["MacCapa"] == "8e":
+                            elif self.ListOfDevices[item][attribut] == "" and "MacCapa" in self.ListOfDevices[item] and self.ListOfDevices[item]["MacCapa"] == "8e":
                                 if attribut == "DeviceType":
                                     device[attribut] = "FFD"
                                 elif attribut == "LogicalType":
@@ -924,7 +982,7 @@ class WebServer(object):
                                 elif attribut == "PowerSource":
                                     device[attribut] = "Main"
 
-                            elif attribut == "LogicalType" and self.ListOfDevices[item][attribut] not in (
+                            elif attribut == "LogicalType" and attribut in self.ListOfDevices[item] and self.ListOfDevices[item][attribut] not in (
                                 "Router",
                                 "Coordinator",
                                 "End Device",
@@ -982,12 +1040,8 @@ class WebServer(object):
                                     device["Type"] = self.ListOfDevices[item]["Ep"][epId]["Type"]
                                     continue
 
-                                _cluster = {}
-                                if cluster in ZCL_CLUSTERS_LIST:
-                                    _cluster[cluster] = ZCL_CLUSTERS_LIST[cluster]
+                                _cluster = {cluster: ZCL_CLUSTERS_LIST[cluster] if cluster in ZCL_CLUSTERS_LIST else "Unknown"}
 
-                                else:
-                                    _cluster[cluster] = "Unknown"
                                 _ep["ClusterList"].append(_cluster)
 
                             ep_lst.append(_ep)
@@ -1091,6 +1145,83 @@ class WebServer(object):
                 _response["Data"] = json.dumps("Executing %s on %s" % (data["Command"], data["payload"]))
         return _response
 
+
+    def rest_raw_zigbee(self, verb, data, parameters):
+        
+        ZIGPY_RAW_COMMAND_ATTRIBUTES = (
+            'GroupAddressFlag',  # Boolean True if we send the request to a group
+            'AckMode',           # Boolean True if we send with Ack
+            'ProfileId',         # Profile ID "0000" (ZDP), 0x0104 (HA)
+            'ClusterId',         # Cluster Id "xxxx" ( ZDP clusters or ZCL clusters)
+            'TargetAddr',        # Target Nwkid "0000" for ZDP
+            'TargetEp',          # Target Endpoint "00" for ZDP
+            'SourceEp',          # Source Endpoint "00" for ZDP
+            'Sqn',               # Sqn number "xx"
+            'Payload',           # ZDP or ZCL payload (include fcf and sqn)
+        )
+
+        self.logging( "Debug","raw_command - %s %s" % (verb, data)) 
+        _response = prepResponseMessage(self, setupHeadersResponse())
+        _response["Headers"]["Content-Type"] = "application/json; charset=utf-8"
+
+        if verb != "PUT":
+            return _response
+        
+        _response["Data"] = None
+        if len(parameters) != 0:
+            return _response
+        
+        data = data.decode("utf8")
+        data = json.loads(data)
+        self.logging( "Debug","---> Data: %s" % str(data))
+        
+        for attr in  ZIGPY_RAW_COMMAND_ATTRIBUTES:
+            if attr not in data:
+                self.logging( "Error","Missing attribute: %s in zigbee-raw-command: %s" % ( attr, data))
+                _response["Data"] = json.dumps("Missing attribute: > %s < in zigbee-raw-command: %s" % ( attr, data) )
+                return _response
+                
+        group_flag = data['GroupAddressFlag']
+        target_address = data['TargetAddr']
+        target_ep = data['TargetEp']
+        clusterid = data['ClusterId']
+        profileid = data['ProfileId']
+        payload = data['Payload']
+        source_ep = data['SourceEp']
+        sqn = data['Sqn']
+        ack_mode = data['AckMode']
+
+        if group_flag:
+            addresse_mode = 0x01
+        elif ack_mode:
+            addresse_mode = 0x07
+        else:
+            addresse_mode = 0x02
+
+              
+        data = {
+            'AddressMode': addresse_mode,
+            'Function': 'rest_raw_zigbee',
+            'Profile': int(profileid, 16),
+            'Cluster': int(clusterid, 16),
+            'TargetNwk': int(target_address, 16),
+            'TargetEp': int(target_ep, 16),
+            'SrcEp': int(source_ep, 16),
+            'Sqn': int(sqn,16),
+            'payload': payload,
+            'timestamp': time.time()
+        }
+        
+        self.logging( "Log","Sending request to coordinator %s" % ( data))
+        self.log.logging(
+            "outRawAPS",
+            "Debug",
+            "zigpy_raw_APS_request - %s ==> Profile: %04x Cluster: %04x TargetNwk: %04x TargetEp: %02x SrcEp: %02x  payload: %s"
+            % ( 'rest_raw_zigbee', data['Profile'], data['Cluster'], data['TargetNwk'], data['TargetEp'], data['SrcEp'], data['payload'])
+        )
+        self.ControllerLink.sendData( "RAW-COMMAND", data, NwkId=int(target_address,16), sqn=int(sqn,16), ackIsDisabled=ack_mode )
+        return _response
+        
     def rest_dev_command(self, verb, data, parameters):
 
         _response = prepResponseMessage(self, setupHeadersResponse())
@@ -1295,8 +1426,49 @@ class WebServer(object):
             self.log.loggingClearErrorHistory()
         return _response
 
+    def rest_battery_state(self, verb, data, parameters):
+        _response = prepResponseMessage(self, setupHeadersResponse())
+        _response["Headers"]["Content-Type"] = "application/json; charset=utf-8"
+        if verb == "GET":
+            _battEnv = {"Battery":{"<30%":{}, "<50%": {}, ">50%" : {}},"Update Time":{ "Unknown": {}, "< 1 week": {}, "> 1 week": {}}}
+            for x in self.ListOfDevices:
+                if x == "0000":
+                        continue
+
+                if self.ListOfDevices[x]["ZDeviceName"] == "":
+                    _deviceName = x
+                else:
+                    _deviceName = self.ListOfDevices[x]["ZDeviceName"]
+
+                if "Battery" in self.ListOfDevices[x] and isinstance(self.ListOfDevices[x]["Battery"], int):
+                    if self.ListOfDevices[x]["Battery"] > 50:
+                        _battEnv["Battery"][">50%"][_deviceName] = {"Battery": self.ListOfDevices[x]["Battery"]}
+
+                    elif self.ListOfDevices[x]["Battery"] > 30:
+                        _battEnv["Battery"]["<50%"][_deviceName] = {"Battery": self.ListOfDevices[x]["Battery"]}
+
+                    else:
+                        _battEnv["Battery"]["<30%"][_deviceName] = {"Battery": self.ListOfDevices[x]["Battery"]}
+
+                    if "BatteryUpdateTime" in self.ListOfDevices[x]:
+                        if (int(time.time()) - self.ListOfDevices[x]["BatteryUpdateTime"]) > 604800:   # one week in seconds
+                            _battEnv["Update Time"]["> 1 week"][_deviceName] = {"BatteryUpdateTime": self.ListOfDevices[x]["BatteryUpdateTime"]}
+
+                        else:
+                            _battEnv["Update Time"]["< 1 week"][_deviceName] = {"BatteryUpdateTime": self.ListOfDevices[x]["BatteryUpdateTime"]}
+
+                    else:
+                        _battEnv["Update Time"]["Unknown"][_deviceName] = "Unknown"
+
+            _response["Data"] = json.dumps(_battEnv, sort_keys=True)
+        return _response
+
     def logging(self, logType, message):
         self.log.logging("WebServer", logType, message)
+
+def dummy_zdevice_name():
+    
+    return [{"Battery": "", "ConsistencyCheck": "ok", "Health": "Live", "IEEE": "90fd9ffffe86c7a1", "LQI": 80, "MacCapa": ["FFD", "RxonIdle", "MainPower"], "Model": "TRADFRI bulb E27 WS clear 950lm", "Param": "{'PowerOnAfterOffOn': 255, 'fadingOff': 0, 'moveToHueSatu': 0, 'moveToColourTemp': 0, 'moveToColourRGB': 0, 'moveToLevel': 0}", "Status": "inDB", "WidgetList": ["Zigbee - TRADFRI bulb E27 WS clear 950lm_ColorControlWW-90fd9ffffe86c7a1-01"], "ZDeviceName": "Led Ikea", "_NwkId": "ada7"}, {"Battery": "", "ConsistencyCheck": "ok", "Health": "Live", "IEEE": "60a423fffe529d60", "LQI": 80, "MacCapa": ["FFD", "RxonIdle", "MainPower"], "Model": "LXEK-1", "Param": "{'PowerOnAfterOffOn': 255, 'fadingOff': 0, 'moveToHueSatu': 0, 'moveToColourTemp': 0, 'moveToColourRGB': 0, 'moveToLevel': 0}", "Status": "inDB", "WidgetList": ["Zigbee - LXEK-1_ColorControlRGBWW-60a423fffe529d60-01"], "ZDeviceName": "Led LKex", "_NwkId": "7173"}, {"Battery": "", "ConsistencyCheck": "ok", "Health": "Live", "IEEE": "680ae2fffe7aca89", "LQI": 80, "MacCapa": ["FFD", "RxonIdle", "MainPower"], "Model": "TRADFRI Signal Repeater", "Param": "{}", "Status": "inDB", "WidgetList": ["Zigbee - TRADFRI Signal Repeater_Voltage-680ae2fffe7aca89-01"], "ZDeviceName": "Repeater", "_NwkId": "a5ee"}, {"Battery": 16.0, "ConsistencyCheck": "ok", "Health": "Not seen last 24hours", "IEEE": "90fd9ffffeea89e8", "LQI": 25, "MacCapa": ["RFD", "Battery"], "Model": "TRADFRI remote control", "Param": "{}", "Status": "inDB", "WidgetList": ["Zigbee - TRADFRI remote control_Ikea_Round_5b-90fd9ffffeea89e8-01"], "ZDeviceName": "Remote Tradfri", "_NwkId": "cee1"}, {"Battery": 100, "ConsistencyCheck": "ok", "Health": "Live", "IEEE": "000d6f0011087079", "LQI": 116, "MacCapa": ["FFD", "RxonIdle", "MainPower"], "Model": "WarningDevice", "Param": "{}", "Status": "inDB", "WidgetList": ["Zigbee - WarningDevice_AlarmWD-000d6f0011087079-01"], "ZDeviceName": "IAS Sirene", "_NwkId": "2e33"}, {"Battery": 53, "ConsistencyCheck": "ok", "Health": "Live", "IEEE": "54ef441000298533", "LQI": 76, "MacCapa": ["RFD", "Battery"], "Model": "lumi.magnet.acn001", "Param": "{}", "Status": "inDB", "WidgetList": ["Zigbee - lumi.magnet.acn001_Door-54ef441000298533-01"], "ZDeviceName": "Lumi Door", "_NwkId": "bb45"}, {"Battery": "", "ConsistencyCheck": "ok", "Health": "Live", "IEEE": "00047400008aff8b", "LQI": 80, "MacCapa": ["FFD", "RxonIdle", "MainPower"], "Model": "Shutter switch with neutral", "Param": "{'netatmoInvertShutter': 0, 'netatmoLedShutter': 0}", "Status": "inDB", "WidgetList": ["Zigbee - Shutter switch with neutral_Venetian-00047400008aff8b-01"], "ZDeviceName": "Inter Shutter Legrand", "_NwkId": "06ab"}, {"Battery": "", "ConsistencyCheck": "ok", "Health": "Live", "IEEE": "000474000082a54f", "LQI": 18, "MacCapa": ["FFD", "RxonIdle", "MainPower"], "Model": "Dimmer switch wo neutral", "Param": "{'netatmoEnableDimmer': 1, 'PowerOnAfterOffOn': 255, 'BallastMaxLevel': 254, 'BallastMinLevel': 1}", "Status": "inDB", "WidgetList": ["Zigbee - Dimmer switch wo neutral_LvlControl-000474000082a54f-01"], "ZDeviceName": "Inter Dimmer Legrand", "_NwkId": "9c25"}, {"Battery": "", "ConsistencyCheck": "ok", "Health": "Live", "IEEE": "00047400001f09a4", "LQI": 80, "MacCapa": ["FFD", "RxonIdle", "MainPower"], "Model": "Micromodule switch", "Param": "{'PowerOnAfterOffOn': 255}", "Status": "inDB", "WidgetList": ["Zigbee - Micromodule switch_Switch-00047400001f09a4-01"], "ZDeviceName": "Micromodule Legrand", "_NwkId": "8706"}, {"Battery": "", "ConsistencyCheck": "ok", "Health": "", "IEEE": "00158d0003021601", "LQI": 0, "MacCapa": ["RFD", "Battery"], "Model": "lumi.sensor_motion.aq2", "Param": "{}", "Status": "inDB", "WidgetList": ["Zigbee - lumi.sensor_motion.aq2_Motion-00158d0003021601-01", "Zigbee - lumi.sensor_motion.aq2_Lux-00158d0003021601-01"], "ZDeviceName": "Lumi Motion", "_NwkId": "6f81"}, {"Battery": 100, "ConsistencyCheck": "ok", "Health": "Live", "IEEE": "0015bc001a01aa27", "LQI": 83, "MacCapa": ["RFD", "Battery"], "Model": "MOSZB-140", "Param": "{}", "Status": "inDB", "WidgetList": ["Zigbee - MOSZB-140_Motion-0015bc001a01aa27-23", "Zigbee - MOSZB-140_Tamper-0015bc001a01aa27-23", "Zigbee - MOSZB-140_Voltage-0015bc001a01aa27-23", "Zigbee - MOSZB-140_Temp-0015bc001a01aa27-26", "Zigbee - MOSZB-140_Lux-0015bc001a01aa27-27"], "ZDeviceName": "Motion frient", "_NwkId": "b9bc"}, {"Battery": 63, "ConsistencyCheck": "ok", "Health": "Live", "IEEE": "00158d000323dabe", "LQI": 61, "MacCapa": ["RFD", "Battery"], "Model": "lumi.sensor_switch", "Param": "{}", "Status": "inDB", "WidgetList": ["Zigbee - lumi.sensor_switch_SwitchAQ2-00158d000323dabe-01"], "ZDeviceName": "Lumi Switch (rond)", "_NwkId": "a029"}, {"Battery": 100.0, "ConsistencyCheck": "ok", "Health": "Live", "IEEE": "000d6ffffea1e6da", "LQI": 94, "MacCapa": ["RFD", "Battery"], "Model": "TRADFRI onoff switch", "Param": "{}", "Status": "inDB", "WidgetList": ["Zigbee - TRADFRI onoff switch_SwitchIKEA-000d6ffffea1e6da-01"], "ZDeviceName": "OnOff Ikea", "_NwkId": "c6ca"}, {"Battery": 100.0, "ConsistencyCheck": "ok", "Health": "Live", "IEEE": "000b57fffe2c0dde", "LQI": 87, "MacCapa": ["RFD", "Battery"], "Model": "TRADFRI wireless dimmer", "Param": "{}", "Status": "inDB", "WidgetList": ["Zigbee - TRADFRI wireless dimmer_GenericLvlControl-000b57fffe2c0dde-01"], "ZDeviceName": "Dim Ikea", "_NwkId": "6c43"}, {"Battery": 100, "ConsistencyCheck": "ok", "Health": "Live", "IEEE": "588e81fffe35f595", "LQI": 80, "MacCapa": ["RFD", "Battery"], "Model": "Wiser2-Thermostat", "Param": "{'WiserLockThermostat': 0, 'WiserRoomNumber': 1}", "Status": "inDB", "WidgetList": ["Zigbee - Wiser2-Thermostat_Temp+Hum-588e81fffe35f595-01", "Zigbee - Wiser2-Thermostat_Humi-588e81fffe35f595-01", "Zigbee - Wiser2-Thermostat_Temp-588e81fffe35f595-01", "Zigbee - Wiser2-Thermostat_ThermoSetpoint-588e81fffe35f595-01", "Zigbee - Wiser2-Thermostat_Valve-588e81fffe35f595-01"], "ZDeviceName": "Wiser Thermostat", "_NwkId": "5a00"}]
 
 
 def check_device_param(self, nwkid, param):

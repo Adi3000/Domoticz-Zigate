@@ -32,7 +32,7 @@
 					"MinInterval": "0005",
 					"MaxInterval": "012C",
 					"TimeOut": "0000",
-					"Change": "0001"
+					"Change": "07D0"
 				}
 			}
 		}
@@ -44,5 +44,7 @@
 		],
 		"0001": [],
 		"0400": []
-	}
+	},
+	"BatteryDevice": 1
+
 }

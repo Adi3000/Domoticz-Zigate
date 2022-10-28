@@ -31,6 +31,7 @@ XIAOMI_POWERMETER_EP = {
     "lumi.plug.mmeu01": "15",
     "lumi.plug.maeu01": "01",
     "lumi.relay.c2acn01": "01",
+    "lumi.switch.n1aeu1": "15"   # Xiaomi Aqara H1 1-gang (neutral wire) WS-EUK03
 }
 
 
@@ -39,7 +40,7 @@ def pollingLumiPower(self, key):
     This fonction is call if enabled to perform any Manufacturer specific polling action
     The frequency is defined in the pollingLumiPower parameter (in number of seconds)
     """
-    if self.busy or self.ZigateComm.loadTransmit() > MAX_LOAD_ZIGATE:
+    if self.busy or self.ControllerLink.loadTransmit() > MAX_LOAD_ZIGATE:
         return True
 
     if "Model" in self.ListOfDevices[key] and self.ListOfDevices[key]["Model"] == "lumi.plug.maeu01":
@@ -124,7 +125,42 @@ def enableOppleSwitch(self, nwkid):
         ackIsDisabled=is_ack_tobe_disabled(self, nwkid),
     )
 
+def enable_operation_mode_aqara( self, nwkid):
+    if nwkid not in self.ListOfDevices:
+        return
 
+    manuf_id = "115f"
+    manuf_spec = "01"
+    cluster_id = "fcc0"
+    Hattribute = "0009"
+    data_type = "20"
+    Hdata = "01" # Event mode
+
+    self.log.logging("Lumi", "Log", "Write enable_operation_mode_aqara AQARA Wireless Switch: %s" % nwkid, nwkid)
+    write_attribute( 
+        self, nwkid, ZIGATE_EP, "01", cluster_id, manuf_id, manuf_spec, Hattribute, data_type, Hdata, 
+        ackIsDisabled=is_ack_tobe_disabled(self, nwkid), )
+
+    
+def enable_click_mode_aqara(self, nwkid):
+    
+    if nwkid not in self.ListOfDevices:
+        return
+
+    manuf_id = "115f"
+    manuf_spec = "01"
+    cluster_id = "fcc0"
+    Hattribute = "0125"
+    data_type = "20"
+    Hdata = "02" # Multi-Click
+
+    self.log.logging("Lumi", "Log", "Write enable_scene_mode_aqara AQARA Wireless Switch: %s" % nwkid, nwkid)
+    write_attribute( 
+        self, nwkid, ZIGATE_EP, "01", cluster_id, manuf_id, manuf_spec, Hattribute, data_type, Hdata, 
+        ackIsDisabled=is_ack_tobe_disabled(self, nwkid), )
+
+    
+    
 def lumiReadRawAPS(self, Devices, srcNWKID, srcEp, ClusterID, dstNWKID, dstEP, MsgPayload):
 
     if srcNWKID not in self.ListOfDevices:

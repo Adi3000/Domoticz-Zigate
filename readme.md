@@ -1,33 +1,108 @@
-# Zigate Plugin for Domoticz
+# Zigbee for Domoticz plugin: Connect all your Zigbee devices to Domoticz
 
-![zigate.fr](https://github.com/pipiche38/Domoticz-Zigate-Wiki/blob/master/Images/ZiGate.png)
+![Zigbee for Domoticz](https://github.com/zigbeefordomoticz/Domoticz-Zigbee/blob/beta6/images/Z4D-200.png )
 
-[![Percentage of issues still open](http://isitmaintained.com/badge/open/pipiche38/Domoticz-Zigate.svg)](http://isitmaintained.com/project/pipiche38/Domoticz-Zigate "Percentage of issues still open")
-[![Average time to resolve an issue](http://isitmaintained.com/badge/resolution/pipiche38/Domoticz-Zigate.svg)](http://isitmaintained.com/project/pipiche38/Domoticz-Zigate "Average time to resolve an issue")
+[![Percentage of issues still open](http://isitmaintained.com/badge/open/zigbeefordomoticz/Domoticz-Zigbee.svg)](http://isitmaintained.com/project/zigbeefordomoticz/Domoticz-Zigbee "Percentage of issues still open")
+[![Average time to resolve an issue](http://isitmaintained.com/badge/resolution/zigbeefordomoticz/Domoticz-Zigbee.svg)](http://isitmaintained.com/project/zigbeefordomoticz/Domoticz-Zigbee "Average time to resolve an issue")
 [![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://paypal.me/pipiche "Donate via PayPal")
+[![CodeFactor](https://www.codefactor.io/repository/github/zigbeefordomoticz/domoticz-zigbee/badge/beta6)](https://www.codefactor.io/repository/github/zigbeefordomoticz/domoticz-zigbee/overview/beta6)
 
-[![CodeFactor](https://www.codefactor.io/repository/github/zigbeefordomoticz/domoticz-zigbee/badge/beta)](https://www.codefactor.io/repository/github/pipiche38/domoticz-zigate/overview/beta)
+## Zigbee for Domoticz
 
-[Zigate](https://zigate.fr "Python Plugin for Domoticz home automation.")
+Zigbee for Domoticz a plugin for [Domoticz home automation software](https://www.domoticz.com/) to connect Zigbee devices through Zigbee coordinator (Zigbee controllers), like [ZiGate](https://zigate.fr), as well as Texas Instruments CC253x/CC13x2/CC26x2 Zigbee adapters/dongles/sticks/keys like [zzh](https://electrolama.com/projects/zig-a-zig-ah/), as well as Silicon Labs Zigbee adapters/dongles/sticks/keys like [elelabs](https://elelabs.com/)
 
-For information around the Zigate Plugin, please refer to :
+This plugin is an evolution of the mature Zigate plugin for Domoticz, which will continue to manage and handle Zigate in native mode, while Texas Instruments's will be handle through unified communication libraries from the [zigpy](https://github.com/zigpy/zigpy) project. Please acknowledge that we are not developping nor maintaining zigpy project, and we rely on the zigpy community for zigpy related issues. If you want to get more insight here are the list of [open issue on zigpy related modules](https://github.com/zigbeefordomoticz/Domoticz-Zigbee/issues/1235)
 
-* <https://github.com/pipiche38/Domoticz-Zigate-Wiki/blob/master/en-eng/Home.md> for information
+For __Windows users__, please check the [Plugin V6 running on Windows](https://zigbeefordomoticz.github.io/wiki/en-eng/Plugin_Version6_on_Windows.html) V6 running on Windows
 
-## COMPATIBILITY WARNING: REQUIRES Domoticz 2020 or above
+## Pre requisities
 
-The current plugin version 5.1 supports ZiGate V1 and ZiGate V2. 
-We strongly recommend to use Domoticz 2021.1 or above
+* Domoticz 2021.1 or above
+* You need Python 3.7 at least
+* Zigpy layers will requires additional python3 modules to be install:
 
-If you cannot be on Domoticz 2020.x or above, please use the 'stable' branch which is the only one compatible with the oldest Domoticz version
+## Plugin first installation or first time on release 6.xxx (stable6)
+
+1. Make sure the pre-requisites steps (here above) have been executed
+
+2. Go in your Domoticz directory using a command line and open the plugins directory.
+  Usually you should be under domoticz/plugins
+
+3. Run: `git clone https://github.com/zigbeefordomoticz/Domoticz-Zigbee.git`
+  It will create a folder 'Domoticz-Zigbee'
+
+4. Go in the Zigbee for Domoticz folder ( Domoticz-Zigbee ).
+  Usally you should be under domoticz/plugins/Domoticz-Zigbee
+  
+5. run: `sudo pip3 install -r requirements.txt`
+
+6. run: `git config --add submodule.recurse true`
+
+7. run: `git submodule update --init --recursive`
+  Finally, make the plugin.py file executable `chmod +x Domoticz-Zigbee/plugin.py`
+
+8. Restart Domoticz.
+
+## Plugin first time on release 6 (stable6 or beta6)
+
+This is the case where you have move from the stable5 branch to stable6/beta6.
+
+1. Make sure the pre-requisites steps (here above) have been executed
+
+2. Go in the Zigbee for Domoticz folder ( Domoticz-Zigbee ).
+  Usally you should be under domoticz/plugins/Domoticz-Zigbee
+
+3. run: `git config --add submodule.recurse true`
+
+4. run: `git submodule update --init --recursive`
+  Finally, make the plugin.py file executable `chmod +x Domoticz-Zigbee/plugin.py`
+  
+5. run: `sudo pip3 install -r requirements.txt`
+
+6. Restart Domoticz. (you need a FULL restart of Domotciz)
+
+[More information available here](https://zigbeefordomoticz.github.io/wiki/en-eng/Plugin_Version-6.html)
+
+## Regular Plugin update (when already on stable6)
+
+1. Go in the Zigbee for Domoticz plugin directory
+  Usally you should be under domoticz/plugins/Domoticz-Zigbee
+  
+2. run: `git pull --recurse-submodules`
+
+3. run: `sudo pip3 install -r requirements.txt`
+
+4. Restart Domoticz or plugin.
+
+## Tested Hardware Zigbee adapters/dongles/sticks/keys
+
+The plugin was originally developed for the [Zigate](https://zigate.fr) Coordinators in close relationship with [Zigate](https://zigate.fr) manufactuer.
+
+### Texas Instrument Zigbee Coordinators
+
+Since late 2021 where we have started opening the plugin to further brands of Zigbee Coordinators and begun focusing on compatibility with the [zzh](https://electrolama.com/projects/zig-a-zig-ah/) from [Electrolama](https://electrolama.com), thanks to their sponsorship.
+
+Any Texas Instruments CC2531, CC13x2, CC26x2 adapters based on the [Zigbee Network Processors](http://dev.ti.com/tirex/content/simplelink_zigbee_sdk_plugin_2_20_00_06/docs/zigbee_user_guide/html/zigbee/introduction.html ) should be supported, more information could be found on [zigpy-znp](https://github.com/zigpy/zigpy-znp) which provided the layer to interface with the coordinator.
+
+You can also find a list of [Texas Instruments supported adapters](https://www.zigbee2mqtt.io/guide/adapters/#recommended) which also works with [zigpy-znp](https://github.com/zigpy/zigpy-znp) and as such should also work with this plugin
+
+### Silicon Labs Zigbee Coordinators
+
+A big thanks to [Elelabs](https://elelabs.com/) sponsorship and whom have help us to ensure full compatibility with their Zigbee Coordinator ELU013 and ELR023.
+
+As for TI coordinator, we rely on [zigpy-bellows](https://github.com/zigpy/bellows) for the Silicon Labs compatibility . A list of compatible hardware is available [here](https://github.com/zigpy/bellows#hardware-requirement)
 
 ## LIMITATIONS
 
 * Please do consider that the current plugin is limited to create a maximum of 255 "Widgets" (Domoticz devices).  This will still give you the possibility to integrate a large number of Zigbee devices , but not an unlimited number.
 
+  * Note that as with all Zigbee hubs/gateways/bridges you will need to add several "Zigbee Router" devices in order to increase the size of your Zigbee network mesh to reach that maximum number of devices, as the Zigbee Coordinator adapter will only support a smaller number of direct connected devices. See documentation troubleshooting section for best practices.
+
+* Currently there is a limitation with the non-ZiGate coordinator to have only 1 coordinator instance.
+
 ## Documentation
 
-Documentation are available on the GitHub [Wiki](https://github.com/pipiche38/Domoticz-Zigate-Wiki "Wiki")
+Documentation are available on the [Wiki](https://zigbeefordomoticz.github.io/wiki)
 
 ## Support
 
@@ -38,37 +113,27 @@ Your first place to get support is via the Forums.
 
 ## About release channels
 
-In order to provide stability and also provide more recent development, Zigate plugin has the following channels
+In order to provide stability and also provide more recent development, Zigbee for Domoticz plugin has the following channels
 
-### stable (will be deprecated)
+* __beta6__: Current developement branch adds [ConBee/RaspBee (deconz) compatibility](https://github.com/zigpy/zigpy-deconz) on top of ZiGate/TI/Silabs support in stable branch.
+* __stable6__: default branch provides stable support for these types of Zigbee Coordinator adapters/dongles/sticks/modules:
+  * [ZiGate](https://zigate.fr) models known today,
+  * [Electrolama zzh/zoe](https://electrolama.com/) models as well as [other Texas Instruments CC26x2/CC13x2 based adapters](https://github.com/zigpy/bellows/blob/dev/README.md#hardware-requirement) with newer [Z-Stack_3.x.0 firmware](https://github.com/Koenkk/Z-Stack-firmware/tree/master/coordinator/Z-Stack_3.x.0/bin),
+  * [Elelabs](https://elelabs.com/shop/)/[Popp](https://popp.eu/zb-stick/) models as well as [other Silicon Labs EFR32MG1x/EFR32MG2x based adapters](https://github.com/zigpy/zigpy-znp/blob/dev/README.md#hardware-requirements) with newer [EZSP v8 firmware](https://github.com/grobasoz/zigbee-firmware/).
 
-Support only ZiGate V1. and supported on best effort
-
-### stable5
-
-Support ALL ZiGate models known today and requires Domoticz 2020.x at minima
-This is considered as a solid , reliable version.
-
-### beta (beta6)
-
-We can open the beta channel to provide early version and to stabilize the version priori to be move to the stable channel
-
-### master ( deprecated )
-
-This channel is not maintained anymore and is not compatible to the most recent version.
-Moving from this channel to the other will required either ar restart from scratch or to do an upgrade of the Domoticz and Zigate database.
+* Not supported
+  * __stable5__: Support ALL ZiGate models known today and requires Domoticz 2020.x at minima (not supported anymore)
+  * *__beta__*: lastest version 6.0.15 - February 2022
+  * *__stable__*: latest version 4.11. - Feb. 2021) deprecated
+  * *__master__*: latest version 3.0. - Sept. 2018) deprecated
 
 ## How to switch from one channel to the other
 
-`git pull`
+`git pull --recurse-submodules`
+`git checkout stable6  // will move you to the stable6 channel`
 
-`git checkout stable5  // will move you to the stable5 channel`
-
-To move to beta6, please do check [here](https://github.com/zigbeefordomoticz/Domoticz-Zigbee/tree/beta6#plugin-first-installation-or-first-time-on-release-6xxx-for-now-beta6)
-
-In case you need to be on stable instead of stable5
-
-`git checkout stable  // will move you to the stable channel`
+`git checkout beta6    // will move you to the beta channel`
+`git pull --recurse-submodules`
 
 ## Donations
 
