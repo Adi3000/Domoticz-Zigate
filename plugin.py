@@ -1664,7 +1664,7 @@ def update_DB_device_status_to_reinit( self ):
 def check_python_modules_version( self ):
     
     MODULES_VERSION = {
-        "dns": "2.2.0rc1",
+        "dns": "2.2.1",
         "serial": "3.5",
         "zigpy": "0.46.0.dev0",
         "zigpy_znp": "0.7.0",
