@@ -435,7 +435,12 @@ def compute_electrical_measurement_conso(self, NwkId, MsgSrcEp, MsgClusterId, Ms
     # By default Multiplier is assumed to be 1
     multiplier = int( self.ListOfDevices[NwkId]["Ep"][MsgSrcEp][MsgClusterId][ multiplier_attribute ] if ( MsgSrcEp in self.ListOfDevices[NwkId]["Ep"] and MsgClusterId in self.ListOfDevices[NwkId]["Ep"][MsgSrcEp] and multiplier_attribute in self.ListOfDevices[NwkId]["Ep"][MsgSrcEp][MsgClusterId] ) else 1 )
     # By default Multiplier is assumed to be 1
-    divisor = int( self.ListOfDevices[NwkId]["Ep"][MsgSrcEp][MsgClusterId][ divisor_attribute ] if ( MsgSrcEp in self.ListOfDevices[NwkId]["Ep"] and MsgClusterId in self.ListOfDevices[NwkId]["Ep"][MsgSrcEp] and divisor_attribute in self.ListOfDevices[NwkId]["Ep"][MsgSrcEp][MsgClusterId] ) else 1 )
+
+    divisor_to_parse = self.ListOfDevices[NwkId]["Ep"][MsgSrcEp][MsgClusterId][ divisor_attribute ] if ( MsgSrcEp in self.ListOfDevices[NwkId]["Ep"] and MsgClusterId in self.ListOfDevices[NwkId]["Ep"][MsgSrcEp] and divisor_attribute in self.ListOfDevices[NwkId]["Ep"][MsgSrcEp][MsgClusterId] ) else 1
+    try:
+        divisor = int(divisor_to_parse)
+    except ValueError:
+        divisor = int(divisor_to_parse, 16)
 
     # compute_electrical_measurement_conso Sometimes device Attributes are 0 Exemple Legrand Cable outlet Attributes 0600,0601,0602,0603 Default to 1 to avoid conso=0 or division by 0
     if multiplier==0:

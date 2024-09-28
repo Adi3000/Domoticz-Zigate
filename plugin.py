@@ -1080,13 +1080,19 @@ def _start_zigpy_deConz(self):
 
     from Classes.ZigpyTransport.Transport import ZigpyTransport
 
+    if Parameters["Mode2"] in ("TCPIP", "Wifi", "Socket") or not Parameters["SerialPort"]:
+        SerialPort = "tcp://" + Parameters["Address"] + ':' + Parameters["Port"]
+        self.transport += "TCP"
+    else:
+        SerialPort = Parameters["SerialPort"]
+
     #self.pythonModuleVersion["zigpy"] = (zigpy.__version__)
     #self.pythonModuleVersion["zigpy_deconz"] = (zigpy_deconz.__version__)
     check_python_modules_version( self )
     self.pluginParameters["Zigpy"] = True
-    self.log.logging("Plugin", "Status","Z4D starting deConz")            
+    self.log.logging("Plugin", "Status",f"Z4D starting deConz with {SerialPort} mode {self.transport} / " + Parameters["Mode2"]  )            
     self.ControllerLink= ZigpyTransport(
-        self.ControllerData, self.pluginParameters, self.pluginconf,self.processFrame, self.zigpy_chk_upd_device, self.zigpy_get_device, self.zigpy_backup_available, self.restart_plugin, self.log, self.statistics, self.HardwareID, "deCONZ", Parameters["SerialPort"]
+        self.ControllerData, self.pluginParameters, self.pluginconf,self.processFrame, self.zigpy_chk_upd_device, self.zigpy_get_device, self.zigpy_backup_available, self.restart_plugin, self.log, self.statistics, self.HardwareID, "deCONZ", SerialPort
         )
     self.ControllerLink.open_cie_connection()
     self.pluginconf.pluginConf["ControllerInRawMode"] = True
@@ -1107,13 +1113,11 @@ def _start_zigpy_EZSP(self):
     self.pluginParameters["Zigpy"] = True
     self.log.logging("Plugin", "Status","Z4D starting EZSP")
 
-    if Parameters["Mode2"] == "Socket":
-        SerialPort = "socket://" + Parameters["IP"] + ':' + Parameters["Port"]
+    if self.Parameters["Mode2"] == "Socket":
+        SerialPort = "socket://" + Parameters["Address"] + ':' + Parameters["Port"]
         self.transport += "Socket"
     else:
         SerialPort = Parameters["SerialPort"]
-
-    SerialPort = Parameters["SerialPort"]
     
     self.ControllerLink= ZigpyTransport(
         self.ControllerData, self.pluginParameters, self.pluginconf,self.processFrame, self.zigpy_chk_upd_device, self.zigpy_get_device, self.zigpy_backup_available, self.restart_plugin, self.log, self.statistics, self.HardwareID, "ezsp", SerialPort
