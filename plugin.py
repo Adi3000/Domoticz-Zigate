@@ -1082,7 +1082,6 @@ def _start_zigpy_deConz(self):
 
     if Parameters["Mode2"] in ("TCPIP", "Wifi", "Socket") or not Parameters["SerialPort"]:
         SerialPort = "tcp://" + Parameters["Address"] + ':' + Parameters["Port"]
-        self.transport += "TCP"
     else:
         SerialPort = Parameters["SerialPort"]
 

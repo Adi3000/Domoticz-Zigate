@@ -12,6 +12,7 @@
 
 import asyncio
 import logging
+import traceback
 
 import zigpy.config as zigpy_conf
 import zigpy.device
@@ -80,6 +81,8 @@ class App_deconz(zigpy_deconz.zigbee.application.ControllerApplication):
 
         except Exception as e:
             LOGGER.error("Couldn't start application", exc_info=e)
+            self.log.logging("TransportZigpy", "Error", "Couldn't start application %s" %e)
+            print(traceback.format_exc())
             await self.shutdown()
             raise
 
